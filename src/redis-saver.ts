@@ -28,9 +28,16 @@ export type RedisSaverParams = {
 export class RedisSaver extends BaseCheckpointSaver {
   connection: Redis;
 
-  constructor({ connection }: RedisSaverParams, serde?: SerializerProtocol) {
+  ttl: number | undefined;
+
+  constructor(
+    { connection }: RedisSaverParams,
+    serde?: SerializerProtocol,
+    ttl?: number
+  ) {
     super(serde);
     this.connection = connection;
+    this.ttl = ttl;
   }
 
   async put(
@@ -66,6 +73,10 @@ export class RedisSaver extends BaseCheckpointSaver {
     };
 
     await this.connection.hset(key, data);
+
+    if (this.ttl) {
+      await this.connection.expire(key, this.ttl);
+    }
 
     return {
       configurable: {
@@ -105,7 +116,10 @@ export class RedisSaver extends BaseCheckpointSaver {
         idx
       );
 
-      void this.connection.hset(key, write);
+      await this.connection.hset(key, write);
+      if (this.ttl) {
+        void this.connection.expire(key, this.ttl);
+      }
     }
   }
 
